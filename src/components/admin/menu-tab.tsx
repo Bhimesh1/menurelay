@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, Fragment } from "react"
 import { MenuItem } from "@prisma/client"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Plus, Trash2, Edit2, Search, Utensils, Coffee, FileUp, Leaf, ShieldAlert, CheckCircle, Save, Download, XCircle, AlertCircle, RotateCcw } from "lucide-react"
-import { deleteMenuItem, deleteAllMenuItems, addMenuItem, updateMenuItem, importMenuFromJson, getMenuJson } from "@/app/actions/menu"
+import { deleteMenuItem, deleteAllMenuItems, addMenuItem, updateMenuItem, importMenuFromJson, getMenuJson, deleteCategory } from "@/app/actions/menu"
 import { extractTextFromPDF } from "@/app/actions/pdf"
 import { menuJsonSchema } from "@/lib/validations"
 import { toast } from "sonner"
@@ -269,11 +269,37 @@ export function MenuTab({ eventId, initialItems, initialMenuJson }: MenuTabProps
         }
     }
 
+    const handleDeleteCategory = async (categoryName: string) => {
+        if (confirm(`Are you sure you want to delete the whole category "${categoryName}" and all its dishes?`)) {
+            try {
+                await deleteCategory(eventId, categoryName)
+                toast.success(`Category "${categoryName}" deleted`)
+                router.refresh()
+            } catch (error) {
+                toast.error("Failed to delete category")
+            }
+        }
+    }
+
     const filteredItems = items.filter(item =>
         item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.category.toLowerCase().includes(searchTerm.toLowerCase())
     )
+
+    // Group items by category
+    const groupedItems = filteredItems.reduce((acc: Record<string, MenuItem[]>, item) => {
+        const cat = item.category || "All"
+        if (!acc[cat]) acc[cat] = []
+        acc[cat].push(item)
+        return acc
+    }, {})
+
+    const categories = Object.keys(groupedItems).sort((a, b) => {
+        if (a === "All") return 1
+        if (b === "All") return -1
+        return a.localeCompare(b)
+    })
 
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 font-sans">
@@ -498,7 +524,7 @@ export function MenuTab({ eventId, initialItems, initialMenuJson }: MenuTabProps
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {filteredItems.length === 0 ? (
+                        {categories.length === 0 ? (
                             <TableRow>
                                 <TableCell colSpan={6} className="h-80 text-center">
                                     <div className="flex flex-col items-center justify-center space-y-4 opacity-40">
@@ -513,60 +539,88 @@ export function MenuTab({ eventId, initialItems, initialMenuJson }: MenuTabProps
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            filteredItems.map((item) => (
-                                <TableRow key={item.id} className="group border-slate-50 hover:bg-indigo-50/30 transition-all duration-300">
-                                    <TableCell className="font-black text-slate-900 pl-8 align-top py-4">
-                                        <span className="bg-slate-50 px-2 py-1 rounded-lg text-[11px] ring-1 ring-slate-200 shadow-sm whitespace-nowrap">{item.code}</span>
-                                    </TableCell>
-                                    <TableCell className="align-top py-4">
-                                        <div className="flex flex-col gap-1">
-                                            <span className="font-black text-slate-800 text-sm leading-snug whitespace-normal">{item.name}</span>
-                                            <div className="flex gap-1 shrink-0 mt-1">
-                                                {item.isDrink && <Coffee className="h-3 w-3 text-amber-500" strokeWidth={3} />}
-                                                {item.isVeg && !item.isVegan && <Leaf className="h-3 w-3 text-emerald-500" strokeWidth={3} />}
-                                                {item.isVegan && (
-                                                    <div className="flex items-center bg-emerald-50 px-1.5 py-0.5 rounded-md ring-1 ring-emerald-100">
-                                                        <Leaf className="h-2.5 w-2.5 text-emerald-600 mr-1" strokeWidth={3} />
-                                                        <span className="text-[7px] font-black text-emerald-600">VEGAN</span>
-                                                    </div>
-                                                )}
+                            categories.map((category) => (
+                                <Fragment key={category}>
+                                    <TableRow className="bg-slate-50/30 hover:bg-slate-50/50 border-y border-slate-100/80">
+                                        <TableCell colSpan={6} className="py-2.5 px-8">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="h-2 w-2 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.5)]" />
+                                                    <span className="font-black text-slate-800 text-xs uppercase tracking-widest">
+                                                        {category}
+                                                    </span>
+                                                    <Badge variant="outline" className="text-[9px] font-black text-slate-400 border-slate-200 bg-white">
+                                                        {groupedItems[category].length} ITEMS
+                                                    </Badge>
+                                                </div>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => handleDeleteCategory(category)}
+                                                    className="h-8 pr-2 pl-3 text-[10px] font-black text-red-400 hover:text-red-500 hover:bg-red-50 rounded-xl gap-2 transition-all active:scale-95"
+                                                >
+                                                    <Trash2 className="h-3 w-3" />
+                                                    DELETE CATEGORY
+                                                </Button>
                                             </div>
-                                        </div>
-                                    </TableCell>
-                                    <TableCell className="align-top py-4 max-w-xs">
-                                        {item.description ? (
-                                            <span className="text-[11px] text-slate-500 font-medium whitespace-normal leading-relaxed block">{item.description}</span>
-                                        ) : (
-                                            <span className="text-[10px] text-slate-300 italic">No details</span>
-                                        )}
-                                    </TableCell>
-                                    <TableCell className="align-top py-4">
-                                        <Badge className="bg-slate-100 text-slate-500 font-bold text-[9px] uppercase tracking-widest px-2 h-6 rounded-lg border-none hover:bg-slate-200 whitespace-nowrap">
-                                            {item.category}
-                                        </Badge>
-                                    </TableCell>
-                                    <TableCell className="text-right font-black text-slate-900 text-sm align-top py-4">
-                                        {item.price ? `${item.price.toFixed(2)}€` : "—"}
-                                    </TableCell>
-                                    <TableCell className="pr-8 align-top py-3">
-                                        <div className="flex justify-center gap-2">
-                                            <Button
-                                                variant="outline" size="icon" className="h-8 w-8 border-slate-200 bg-white rounded-lg hover:text-indigo-600 hover:ring-2 hover:ring-indigo-100 active:scale-95 transition-all shadow-sm"
-                                                onClick={() => startEdit(item)}
-                                            >
-                                                <Edit2 className="h-3.5 w-3.5 text-slate-400 hover:text-indigo-600" />
-                                            </Button>
-                                            <Button
-                                                variant="outline"
-                                                size="icon"
-                                                className="h-8 w-8 border-slate-200 bg-white rounded-lg hover:text-red-500 hover:ring-2 hover:ring-red-100 active:scale-95 transition-all shadow-sm"
-                                                onClick={() => handleDelete(item.id)}
-                                            >
-                                                <Trash2 className="h-3.5 w-3.5 text-slate-400 hover:text-red-500" />
-                                            </Button>
-                                        </div>
-                                    </TableCell>
-                                </TableRow>
+                                        </TableCell>
+                                    </TableRow>
+                                    {groupedItems[category].map((item) => (
+                                        <TableRow key={item.id} className="group border-slate-50 hover:bg-slate-50/80 transition-all duration-200">
+                                            <TableCell className="font-black text-slate-900 pl-8 align-top py-4">
+                                                <span className="bg-slate-50 px-2 py-1 rounded-lg text-[11px] ring-1 ring-slate-200 shadow-sm whitespace-nowrap">{item.code}</span>
+                                            </TableCell>
+                                            <TableCell className="align-top py-4">
+                                                <div className="flex flex-col gap-1">
+                                                    <span className="font-black text-slate-800 text-sm leading-snug whitespace-normal">{item.name}</span>
+                                                    <div className="flex gap-1 shrink-0 mt-1">
+                                                        {item.isDrink && <Coffee className="h-3 w-3 text-amber-500" strokeWidth={3} />}
+                                                        {item.isVeg && !item.isVegan && <Leaf className="h-3 w-3 text-emerald-500" strokeWidth={3} />}
+                                                        {item.isVegan && (
+                                                            <div className="flex items-center bg-emerald-50 px-1.5 py-0.5 rounded-md ring-1 ring-emerald-100">
+                                                                <Leaf className="h-2.5 w-2.5 text-emerald-600 mr-1" strokeWidth={3} />
+                                                                <span className="text-[7px] font-black text-emerald-600">VEGAN</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="align-top py-4 max-w-xs">
+                                                {item.description ? (
+                                                    <span className="text-[11px] text-slate-500 font-medium whitespace-normal leading-relaxed block">{item.description}</span>
+                                                ) : (
+                                                    <span className="text-[10px] text-slate-300 italic">No details</span>
+                                                )}
+                                            </TableCell>
+                                            <TableCell className="align-top py-4">
+                                                <Badge className="bg-slate-50 text-slate-400 font-bold text-[9px] uppercase tracking-widest px-2 h-6 rounded-lg border-none whitespace-nowrap">
+                                                    {item.category}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell className="text-right font-black text-slate-900 text-sm align-top py-4">
+                                                {item.price ? `${item.price.toFixed(2)}€` : "—"}
+                                            </TableCell>
+                                            <TableCell className="pr-8 align-top py-3">
+                                                <div className="flex justify-center gap-2">
+                                                    <Button
+                                                        variant="outline" size="icon" className="h-8 w-8 border-slate-200 bg-white rounded-lg hover:text-indigo-600 hover:ring-2 hover:ring-indigo-100 active:scale-95 transition-all shadow-sm"
+                                                        onClick={() => startEdit(item)}
+                                                    >
+                                                        <Edit2 className="h-3.5 w-3.5 text-slate-400 hover:text-indigo-600" />
+                                                    </Button>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="icon"
+                                                        className="h-8 w-8 border-slate-200 bg-white rounded-lg hover:text-red-500 hover:ring-2 hover:ring-red-100 active:scale-95 transition-all shadow-sm"
+                                                        onClick={() => handleDelete(item.id)}
+                                                    >
+                                                        <Trash2 className="h-3.5 w-3.5 text-slate-400 hover:text-red-500" />
+                                                    </Button>
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </Fragment>
                             ))
                         )}
                     </TableBody>

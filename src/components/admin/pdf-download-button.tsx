@@ -22,7 +22,7 @@ export function PDFDownloadButton({ event, totals, orders }: any) {
     const fileName = `MasterOrder_${event.slug}_${new Date().toISOString().split('T')[0]}.pdf`
 
     // Create a key based on PDF settings to force a fresh render when they change
-    const downloadKey = `${event.pdfHeaderTitle}-${event.pdfReportTitle}-${event.pdfAddress}-${event.pdfRestaurantLabel}-${event.pdfSectionTitle}`
+    const downloadKey = `${event.pdfHeaderTitle}-${event.pdfReportTitle}-${event.pdfAddress}-${event.pdfRestaurantLabel}-${event.pdfSectionTitle}-${event.spiceScale}`
 
     return (
         <PDFDownloadLink

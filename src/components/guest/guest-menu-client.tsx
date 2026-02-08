@@ -192,7 +192,7 @@ export function GuestMenuClient({
                 basePrice: price,
                 priceSnapshot: price,
                 spiceLevel: customSpice,
-                spiceScale: eventSpiceScale,
+                spiceScale: customSpiceScale,
                 note: customNote
             }
             setCart(prev => [...prev, newItem])
@@ -209,7 +209,7 @@ export function GuestMenuClient({
                 basePrice: selectedBundle.price,
                 priceSnapshot: selectedBundle.price,
                 spiceLevel: 0,
-                spiceScale: eventSpiceScale,
+                spiceScale: customSpiceScale,
                 note: customNote
             }
             setCart(prev => [...prev, newItem])

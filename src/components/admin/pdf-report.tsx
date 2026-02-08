@@ -249,11 +249,13 @@ export function MasterOrderPDF({ event, totals, orders }: any) {
                                 </View>
 
                                 {order.items.map((item: any, iIdx: number) => {
-                                    const rawSpiceLabel = item.spiceLevel > 0
-                                        ? SPICE_LEVELS[spiceScale as keyof typeof SPICE_LEVELS][item.spiceLevel] || "Unknown"
-                                        : null
+                                    const spiceScaleToUse = (item.spiceScale && SPICE_LEVELS[item.spiceScale as keyof typeof SPICE_LEVELS])
+                                        ? item.spiceScale
+                                        : "GERMAN"
 
-                                    const spiceLabel = rawSpiceLabel ? `${spiceScale} ${rawSpiceLabel}` : null
+                                    const spiceLabel = item.spiceLevel > 0
+                                        ? `${spiceScaleToUse === 'GERMAN' ? 'GERMAN' : 'INDIAN'} ${SPICE_LEVELS[spiceScaleToUse as keyof typeof SPICE_LEVELS][item.spiceLevel] || "Unknown"}`
+                                        : null
 
                                     return (
                                         <View key={iIdx} style={{ marginBottom: 12 }}>

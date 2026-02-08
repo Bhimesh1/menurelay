@@ -255,3 +255,28 @@ export async function deleteAllMenuItems(eventId: string) {
 
     revalidatePath(`/admin/e/[slug]`, "page")
 }
+
+export async function deleteCategory(eventId: string, categoryName: string) {
+    const session = await auth()
+    if (!session?.user?.id) throw new Error("Unauthorized")
+
+    await prisma.$transaction(async (tx) => {
+        // Delete all items in this category
+        await tx.menuItem.deleteMany({
+            where: {
+                eventId,
+                category: categoryName
+            }
+        })
+
+        // Also delete the category record if it exists
+        await tx.category.deleteMany({
+            where: {
+                eventId,
+                name: categoryName
+            }
+        })
+    })
+
+    revalidatePath(`/admin/e/[slug]`, "page")
+}
