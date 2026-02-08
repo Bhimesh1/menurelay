@@ -1,0 +1,174 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  events       Event[]
+}
+
+model Event {
+  id             String       @id @default(cuid())
+  userId         String
+  slug           String       @unique
+  title             String
+  restaurantName    String?
+  pdfHeaderTitle    String       @default("New Party Order")
+  pdfAddress        String?
+  pdfReportTitle    String       @default("MASTER ORDER SUMMARY")
+  pdfRestaurantLabel String      @default("Restaurant")
+  pdfSectionTitle   String       @default("DETAILED ORDERS")
+  showPrices        Boolean      @default(true)
+  spiceScale        SpiceScale   @default(GERMAN)
+  status            EventStatus  @default(DRAFT)
+  vipName           String?      // Name to trigger special celebration
+  vipMessage        String?      // Special message for the VIP
+  menuJson          Json?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  user           User         @relation(fields: [userId], references: [id])
+  guestOrders    GuestOrder[]
+  menuItems      MenuItem[]
+  categories     Category[]
+  bundles        Bundle[]
+}
+
+model Category {
+  id      String     @id @default(cuid())
+  eventId String
+  key     String // "id" from JSON
+  name    String
+  sort    Int        @default(0)
+  type    String     @default("FOOD")
+  event   Event      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  items   MenuItem[]
+
+  @@unique([eventId, key])
+}
+
+model MenuItem {
+  id          String           @id @default(cuid())
+  eventId     String
+  categoryId  String
+  code        String
+  name        String
+  description String?
+  category    String // Keeping original field for compatibility or search
+  price       Float?
+  photoUrl    String? // Old field, maybe deprecated by images
+  isVeg       Boolean          @default(false)
+  isVegan     Boolean          @default(false)
+  isHidden    Boolean          @default(false)
+  isDrink     Boolean          @default(false)
+  tags        String[]         @default([])
+  sortOrder   Int              @default(0)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  event       Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  categoryRel Category         @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  images      MenuItemImage[]
+  options     MenuItemOption[]
+  orderItems  OrderItem[]
+
+  @@unique([eventId, code])
+}
+
+model MenuItemImage {
+  id     String   @id @default(cuid())
+  itemId String
+  url    String
+  sort   Int      @default(0)
+  item   MenuItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+}
+
+model MenuItemOption {
+  id      String   @id @default(cuid())
+  itemId  String
+  label   String
+  metaQty String?
+  price   Float
+  item    MenuItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+}
+
+model Bundle {
+  id          String       @id @default(cuid())
+  eventId     String
+  code        String
+  name        String
+  description String?
+  price       Float
+  event       Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  lines       BundleLine[]
+  orderItems  OrderItem[]
+
+  @@unique([eventId, code])
+}
+
+model BundleLine {
+  id       String  @id @default(cuid())
+  bundleId String
+  label    String
+  note     String?
+  qty      Int     @default(1)
+  bundle   Bundle  @relation(fields: [bundleId], references: [id], onDelete: Cascade)
+}
+
+model GuestOrder {
+  id        String      @id @default(cuid())
+  eventId   String
+  guestName String
+  notes     String?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  event     Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  items     OrderItem[]
+
+  @@unique([eventId, guestName])
+}
+
+model OrderItem {
+  id           String     @id @default(cuid())
+  guestOrderId String
+  menuItemId   String?
+  bundleId     String?
+  kind         OrderKind  @default(ITEM)
+  codeSnapshot String
+  nameSnapshot String
+  qty          Int
+  optionLabel  String?
+  optionPrice  Float?
+  priceSnapshot Float     @default(0) // New: Persist the final unit price at order time
+  spiceLevel   Int        @default(0)
+  spiceScale   SpiceScale
+  note         String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  guestOrder   GuestOrder @relation(fields: [guestOrderId], references: [id], onDelete: Cascade)
+  menuItem     MenuItem?  @relation(fields: [menuItemId], references: [id])
+  bundle       Bundle?    @relation(fields: [bundleId], references: [id])
+}
+
+enum OrderKind {
+  ITEM
+  BUNDLE
+}
+
+enum EventStatus {
+  DRAFT
+  PUBLISHED
+  LOCKED
+}
+
+enum SpiceScale {
+  GERMAN
+  INDIAN
+}
