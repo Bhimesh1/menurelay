@@ -4,6 +4,7 @@ import { authConfig } from "./auth.config"
 import bcrypt from "bcryptjs"
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+    trustHost: true,
     ...authConfig,
     providers: [
         Credentials({
