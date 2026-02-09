@@ -43,13 +43,16 @@ model Event {
 }
 
 model Category {
-  id      String     @id @default(cuid())
-  eventId String
-  key     String // "id" from JSON
-  name    String
-  sort    Int        @default(0)
-  type    String     @default("FOOD")
-  event   Event      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  id       String     @id @default(cuid())
+  eventId  String
+  key      String // "id" from JSON
+  name     String
+  sort     Int        @default(0)
+  type     String     @default("FOOD")
+  parentId String?
+  parent   Category?  @relation("CategoryToCategory", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryToCategory")
+  event    Event      @relation(fields: [eventId], references: [id], onDelete: Cascade)
   items   MenuItem[]
 
   @@unique([eventId, key])
@@ -63,6 +66,7 @@ model MenuItem {
   name        String
   description String?
   category    String // Keeping original field for compatibility or search
+  subCategory String?
   price       Float?
   photoUrl    String? // Old field, maybe deprecated by images
   isVeg       Boolean          @default(false)

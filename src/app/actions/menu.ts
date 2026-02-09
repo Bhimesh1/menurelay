@@ -89,6 +89,7 @@ export async function importMenuFromJson(eventId: string, json: any) {
                         name: item.name,
                         description: item.description,
                         category: validated.categories.find(c => c.id === item.categoryId)?.name || "General",
+                        subCategory: item.subCategory,
                         price: item.price,
                         isVeg: item.diet?.veg || false,
                         isVegan: item.diet?.vegan || false,
@@ -185,19 +186,41 @@ export async function addMenuItem(eventId: string, data: any) {
     const session = await auth()
     if (!session?.user?.id) throw new Error("Unauthorized")
 
-    // For manual add, we need a category. We'll find or create a "Manual" category.
-    let category = await prisma.category.findFirst({
-        where: { eventId, name: data.category }
-    })
+    let categoryId = data.categoryId
+    let categoryName = data.category
 
-    if (!category) {
-        category = await prisma.category.create({
-            data: {
-                eventId,
-                key: slugify(data.category),
-                name: data.category,
-            }
+    if (!categoryId) {
+        // For manual add, we need a category. We'll find or create a "Manual" category.
+        let category = await prisma.category.findFirst({
+            where: { eventId, name: data.category }
         })
+
+        if (!category) {
+            category = await prisma.category.create({
+                data: {
+                    eventId,
+                    key: slugify(data.category),
+                    name: data.category,
+                }
+            })
+        }
+        categoryId = category.id
+        categoryName = category.name
+    } else {
+        const cat = await prisma.category.findUnique({
+            where: { id: categoryId },
+            include: { parent: true } as any
+        })
+        if (cat) {
+            const c = cat as any
+            if (c.parent) {
+                categoryName = c.parent.name
+                data.subCategory = c.name
+            } else {
+                categoryName = c.name
+                data.subCategory = data.subCategory || null
+            }
+        }
     }
 
     const item = await prisma.menuItem.create({
@@ -205,7 +228,9 @@ export async function addMenuItem(eventId: string, data: any) {
             ...data,
             price: parseFloat(data.price) || 0,
             eventId,
-            categoryId: category.id,
+            categoryId,
+            category: categoryName,
+            subCategory: data.subCategory || null,
         },
     })
 
@@ -217,11 +242,33 @@ export async function updateMenuItem(id: string, data: any) {
     const session = await auth()
     if (!session?.user?.id) throw new Error("Unauthorized")
 
+    let categoryName = data.category
+    let subCategory = data.subCategory
+
+    if (data.categoryId) {
+        const cat = await prisma.category.findUnique({
+            where: { id: data.categoryId },
+            include: { parent: true } as any
+        })
+        if (cat) {
+            const c = cat as any
+            if (c.parent) {
+                categoryName = c.parent.name
+                subCategory = c.name
+            } else {
+                categoryName = c.name
+                subCategory = data.subCategory
+            }
+        }
+    }
+
     const item = await prisma.menuItem.update({
         where: { id },
         data: {
             ...data,
-            price: data.price ? parseFloat(data.price) : undefined
+            category: categoryName,
+            price: data.price ? parseFloat(data.price) : undefined,
+            subCategory: subCategory !== undefined ? subCategory : undefined
         },
     })
 
@@ -261,11 +308,14 @@ export async function deleteCategory(eventId: string, categoryName: string) {
     if (!session?.user?.id) throw new Error("Unauthorized")
 
     await prisma.$transaction(async (tx) => {
-        // Delete all items in this category
+        // Delete all items in this category or subcategory
         await tx.menuItem.deleteMany({
             where: {
                 eventId,
-                category: categoryName
+                OR: [
+                    { category: categoryName },
+                    { subCategory: categoryName }
+                ]
             }
         })
 

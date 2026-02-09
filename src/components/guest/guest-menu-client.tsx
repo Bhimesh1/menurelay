@@ -132,7 +132,15 @@ export function GuestMenuClient({
         let items = menuItems.filter(item => !item.isHidden)
 
         if (activeCategory !== "all" && activeCategory !== "bundles") {
-            items = items.filter(item => item.categoryId === activeCategory)
+            // Get subcategories of the active category
+            const subCatIds = categories
+                .filter(c => c.parentId === activeCategory)
+                .map(c => c.id)
+
+            items = items.filter(item =>
+                item.categoryId === activeCategory ||
+                (item.categoryId && subCatIds.includes(item.categoryId))
+            )
         }
 
         if (searchQuery) {
@@ -144,7 +152,22 @@ export function GuestMenuClient({
             )
         }
         return items
-    }, [menuItems, activeCategory, searchQuery])
+    }, [menuItems, activeCategory, searchQuery, categories])
+
+    // Group items by subcategory for display
+    const groupedFilteredItems = useMemo(() => {
+        const groups: Record<string, MenuItemWithRelations[]> = {}
+
+        filteredItems.forEach(item => {
+            const cat = categories.find(c => c.id === item.categoryId)
+            const subName = (cat && cat.parentId) ? cat.name : "None"
+
+            if (!groups[subName]) groups[subName] = []
+            groups[subName].push(item)
+        })
+
+        return groups
+    }, [filteredItems, categories])
 
     // Filter Bundles
     const filteredBundles = useMemo(() => {
@@ -473,7 +496,7 @@ export function GuestMenuClient({
                                 Set Menus ✨
                             </button>
                         )}
-                        {categories.map(cat => (
+                        {categories.filter(c => !c.parentId).map(cat => (
                             <button
                                 key={cat.id}
                                 onClick={() => setActiveCategory(cat.id)}
@@ -556,44 +579,58 @@ export function GuestMenuClient({
                         </span>
                         Menu Items
                     </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {filteredItems.map(item => (
-                            <motion.div
-                                key={item.id}
-                                layoutId={`item-${item.id}`}
-                                className="bg-white rounded-[1.5rem] p-4 shadow-sm border border-slate-100 flex gap-4 active:scale-[0.98] transition-all hover:border-indigo-200 hover:shadow-md"
-                                onClick={() => openItemModal(item)}
-                            >
-                                <div className="flex-1 min-w-0 flex flex-col justify-center">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <span className="text-[10px] font-black bg-indigo-50 text-indigo-400 px-2 py-0.5 rounded-md">{item.code}</span>
-                                        {item.categoryId && (
-                                            <span className="text-[9px] font-bold text-slate-300 uppercase tracking-wider truncate">
-                                                {categories.find(c => c.id === item.categoryId)?.name}
-                                            </span>
-                                        )}
+                    <div className="space-y-6">
+                        {Object.keys(groupedFilteredItems).sort((a, b) => {
+                            if (a === "None") return -1
+                            if (b === "None") return 1
+                            return a.localeCompare(b)
+                        }).map(subName => (
+                            <div key={subName} className="space-y-3">
+                                {subName !== "None" && (
+                                    <div className="flex items-center gap-3 px-2 py-1">
+                                        <div className="h-1.5 w-1.5 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.4)]" />
+                                        <h4 className="text-[11px] font-black text-slate-600 uppercase tracking-[0.15em]">
+                                            {subName}
+                                        </h4>
+                                        <div className="h-[1px] flex-1 bg-slate-100" />
                                     </div>
-                                    <h4 className="font-black text-slate-800 leading-snug mb-1">{item.name}</h4>
-                                    {item.description && (
-                                        <p className="text-xs text-slate-400 font-medium line-clamp-2 leading-relaxed">{item.description}</p>
-                                    )}
-                                    <div className="flex flex-wrap gap-1 mt-3">
-                                        {item.isVeg && !item.isVegan && <Badge variant="secondary" className="bg-emerald-50 text-emerald-600 text-[9px] px-1.5 h-5 gap-1 hover:bg-emerald-100"><Leaf className="h-2.5 w-2.5" /> VEG</Badge>}
-                                        {item.isVegan && <Badge variant="secondary" className="bg-emerald-50 text-emerald-600 text-[9px] px-1.5 h-5 gap-1 hover:bg-emerald-100"><Leaf className="h-2.5 w-2.5" /> VEGAN</Badge>}
-                                        {item.isDrink && <Badge variant="secondary" className="bg-blue-50 text-blue-600 text-[9px] px-1.5 h-5 gap-1 hover:bg-blue-100"><Coffee className="h-2.5 w-2.5" /> DRINK</Badge>}
-                                    </div>
+                                )}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    {groupedFilteredItems[subName].map(item => (
+                                        <motion.div
+                                            key={item.id}
+                                            layoutId={`item-${item.id}`}
+                                            className="bg-white rounded-[1.5rem] p-4 shadow-sm border border-slate-100 flex gap-4 active:scale-[0.98] transition-all hover:border-indigo-200 hover:shadow-md"
+                                            onClick={() => openItemModal(item)}
+                                        >
+                                            <div className="flex-1 min-w-0 flex flex-col justify-center">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <span className="text-[10px] font-black bg-indigo-50 text-indigo-400 px-2 py-0.5 rounded-md">{item.code}</span>
+                                                </div>
+                                                <h4 className="font-black text-slate-800 leading-snug mb-1">{item.name}</h4>
+                                                {item.description && (
+                                                    <p className="text-xs text-slate-400 font-medium line-clamp-2 leading-relaxed">{item.description}</p>
+                                                )}
+                                                <div className="flex flex-wrap gap-1 mt-3">
+                                                    {item.isVeg && !item.isVegan && <Badge variant="secondary" className="bg-emerald-50 text-emerald-600 text-[9px] px-1.5 h-5 gap-1 hover:bg-emerald-100"><Leaf className="h-2.5 w-2.5" /> VEG</Badge>}
+                                                    {item.isVegan && <Badge variant="secondary" className="bg-emerald-50 text-emerald-600 text-[9px] px-1.5 h-5 gap-1 hover:bg-emerald-100"><Leaf className="h-2.5 w-2.5" /> VEGAN</Badge>}
+                                                    {item.isDrink && <Badge variant="secondary" className="bg-blue-50 text-blue-600 text-[9px] px-1.5 h-5 gap-1 hover:bg-blue-100"><Coffee className="h-2.5 w-2.5" /> DRINK</Badge>}
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-col justify-between items-end shrink-0">
+                                                {showPrices && (
+                                                    <span className="font-black text-slate-900 bg-slate-50 px-2 py-1 rounded-xl shadow-inner text-sm">
+                                                        {item.price ? item.price.toFixed(2) : "—"}€
+                                                    </span>
+                                                )}
+                                                <Button size="icon" className="h-9 w-9 rounded-full bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white transition-colors">
+                                                    <Plus className="h-5 w-5" />
+                                                </Button>
+                                            </div>
+                                        </motion.div>
+                                    ))}
                                 </div>
-                                <div className="flex flex-col justify-between items-end shrink-0">
-                                    {showPrices && (
-                                        <span className="font-black text-slate-900 bg-slate-50 px-2 py-1 rounded-xl shadow-inner text-sm">
-                                            {item.price ? item.price.toFixed(2) : "—"}€
-                                        </span>
-                                    )}
-                                    <Button size="icon" className="h-9 w-9 rounded-full bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white transition-colors">
-                                        <Plus className="h-5 w-5" />
-                                    </Button>
-                                </div>
-                            </motion.div>
+                            </div>
                         ))}
                     </div>
                 </div>

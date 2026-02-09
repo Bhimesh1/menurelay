@@ -26,6 +26,7 @@ export const jsonMenuItemSchema = z.object({
     name: z.string(),
     description: z.string().optional().nullable(),
     categoryId: z.string(),
+    subCategory: z.string().optional().nullable(),
     price: z.number().optional().nullable(),
     diet: z.object({
         veg: z.boolean().default(false),
