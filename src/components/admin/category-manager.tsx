@@ -40,7 +40,7 @@ export function CategoryManager({ eventId, categories, isOpen, onOpenChange, ini
         }
     }, [isOpen, initialCategoryId])
 
-    const handleUpdate = async (id: string, updates: { name?: string, parentId?: string | null }) => {
+    const handleUpdate = async (id: string, updates: { name?: string, parentId?: string | null, isHidden?: boolean }) => {
         try {
             await updateCategory(id, updates)
             toast.success("Category updated")
