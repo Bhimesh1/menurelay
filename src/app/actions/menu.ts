@@ -74,29 +74,57 @@ export async function importMenuFromJson(eventId: string, json: any) {
                 categoriesMap[cat.id] = created.id
             }
 
-            // 2. Create Items
+            // 2. Create or Update Items
             for (const item of validated.items) {
                 const categoryInternalId = categoriesMap[item.categoryId]
                 if (!categoryInternalId) {
                     throw new Error(`Category link failed: Category ID "${item.categoryId}" not found in categories list.`)
                 }
 
-                const createdItem = await tx.menuItem.create({
-                    data: {
-                        eventId,
-                        categoryId: categoryInternalId,
-                        code: item.code,
-                        name: item.name,
-                        description: item.description,
-                        category: validated.categories.find(c => c.id === item.categoryId)?.name || "General",
-                        subCategory: item.subCategory,
-                        price: item.price,
-                        isVeg: item.diet?.veg || false,
-                        isVegan: item.diet?.vegan || false,
-                        isDrink: validated.categories.find(c => c.id === item.categoryId)?.type === "DRINK",
-                        tags: item.tags || [],
+                // Check if item already exists
+                const existingItem = await tx.menuItem.findUnique({
+                    where: {
+                        eventId_code: {
+                            eventId,
+                            code: item.code
+                        }
                     }
                 })
+
+                const itemData = {
+                    categoryId: categoryInternalId,
+                    code: item.code,
+                    name: item.name,
+                    description: item.description,
+                    category: validated.categories.find(c => c.id === item.categoryId)?.name || "General",
+                    subCategory: item.subCategory,
+                    price: item.price,
+                    isVeg: item.diet?.veg || false,
+                    isVegan: item.diet?.vegan || false,
+                    isDrink: validated.categories.find(c => c.id === item.categoryId)?.type === "DRINK",
+                    tags: item.tags || [],
+                }
+
+                let createdItem
+                if (existingItem) {
+                    // Update existing item
+                    createdItem = await tx.menuItem.update({
+                        where: { id: existingItem.id },
+                        data: itemData
+                    })
+
+                    // Delete old images and options
+                    await tx.menuItemImage.deleteMany({ where: { itemId: existingItem.id } })
+                    await tx.menuItemOption.deleteMany({ where: { itemId: existingItem.id } })
+                } else {
+                    // Create new item
+                    createdItem = await tx.menuItem.create({
+                        data: {
+                            eventId,
+                            ...itemData
+                        }
+                    })
+                }
 
                 if (item.images && item.images.length > 0) {
                     await tx.menuItemImage.createMany({
