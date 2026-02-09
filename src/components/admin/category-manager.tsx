@@ -12,6 +12,7 @@ import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import { Trash2, Plus, Save, Edit2, Eye, EyeOff } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { DeleteCategoryDialog } from "./delete-category-dialog"
 
 interface CategoryManagerProps {
     eventId: string
@@ -28,6 +29,10 @@ export function CategoryManager({ eventId, categories, isOpen, onOpenChange, ini
     const [editParentId, setEditParentId] = useState<string | "none">("none")
     const [isAdding, setIsAdding] = useState(false)
     const [newName, setNewName] = useState("")
+
+    // Deletion states
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+    const [catToDelete, setCatToDelete] = useState<any>(null)
 
     useEffect(() => {
         if (isOpen && initialCategoryId) {
@@ -68,15 +73,24 @@ export function CategoryManager({ eventId, categories, isOpen, onOpenChange, ini
         }
     }
 
-    const handleDelete = async (id: string) => {
-        if (confirm("Delete this category? Items will remain but may lose their grouping.")) {
-            try {
-                await deleteCategory(id)
-                toast.success("Category deleted")
-                router.refresh()
-            } catch (error) {
-                toast.error("Failed to delete category")
-            }
+    const handleDeleteClick = (id: string) => {
+        const cat = categories.find(c => c.id === id)
+        if (!cat) return
+        setCatToDelete(cat)
+        setIsDeleteDialogOpen(true)
+    }
+
+    const onConfirmDelete = async (deleteAllItems: boolean) => {
+        if (!catToDelete) return
+
+        try {
+            await deleteCategory(catToDelete.id, deleteAllItems)
+            toast.success(deleteAllItems ? "Category and items deleted" : "Category deleted, items reassigned")
+            setIsDeleteDialogOpen(false)
+            setCatToDelete(null)
+            router.refresh()
+        } catch (error) {
+            toast.error("Failed to delete category")
         }
     }
 
@@ -166,7 +180,7 @@ export function CategoryManager({ eventId, categories, isOpen, onOpenChange, ini
                                             <Edit2 className="h-4 w-4" />
                                         </Button>
                                     )}
-                                    <Button size="icon" variant="ghost" className="h-10 w-10 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl" onClick={() => handleDelete(cat.id)}>
+                                    <Button size="icon" variant="ghost" className="h-10 w-10 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl" onClick={() => handleDeleteClick(cat.id)}>
                                         <Trash2 className="h-4 w-4" />
                                     </Button>
                                 </div>
@@ -220,6 +234,17 @@ export function CategoryManager({ eventId, categories, isOpen, onOpenChange, ini
                     </Button>
                 </DialogFooter>
             </DialogContent>
+
+            {catToDelete && (
+                <DeleteCategoryDialog
+                    isOpen={isDeleteDialogOpen}
+                    onOpenChange={setIsDeleteDialogOpen}
+                    categoryName={catToDelete.name}
+                    isSubcategory={!!catToDelete.parentId}
+                    parentName={categories.find(c => c.id === catToDelete.parentId)?.name}
+                    onConfirm={onConfirmDelete}
+                />
+            )}
         </Dialog>
     )
 }

@@ -20,6 +20,7 @@ import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { CategoryManager } from "./category-manager"
+import { DeleteCategoryDialog } from "./delete-category-dialog"
 
 interface MenuTabProps {
     eventId: string
@@ -42,6 +43,11 @@ export function MenuTab({ eventId, initialItems, initialMenuJson }: MenuTabProps
     const [validationErrors, setValidationErrors] = useState<any[]>([])
     const fileInputRef = useRef<HTMLInputElement>(null)
     const jsonInputRef = useRef<HTMLInputElement>(null)
+
+    // Deletion states
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+    const [catToDelete, setCatToDelete] = useState<any>(null)
+
     const router = useRouter()
 
     useEffect(() => {
@@ -318,14 +324,25 @@ export function MenuTab({ eventId, initialItems, initialMenuJson }: MenuTabProps
     }
 
     const handleDeleteCategory = async (categoryName: string) => {
-        if (confirm(`Are you sure you want to delete the whole category "${categoryName}" and all its dishes?`)) {
-            try {
-                await deleteCategoryFromMenu(eventId, categoryName)
-                toast.success(`Category "${categoryName}" deleted`)
-                router.refresh()
-            } catch (error) {
-                toast.error("Failed to delete category")
-            }
+        const cat = allCategories.find(c => c.name === categoryName)
+        if (!cat) return
+        setCatToDelete(cat)
+        setIsDeleteDialogOpen(true)
+    }
+
+    const onConfirmDeleteCategory = async (deleteAllItems: boolean) => {
+        if (!catToDelete) return
+
+        try {
+            await deleteCategory(catToDelete.id, deleteAllItems)
+            toast.success(deleteAllItems ? "Category and items deleted" : "Category deleted, items reassigned")
+            setIsDeleteDialogOpen(false)
+            setCatToDelete(null)
+            router.refresh()
+            // Refresh counts/grouping locally if needed, or fetchCats
+            fetchCats()
+        } catch (error) {
+            toast.error("Failed to delete category")
         }
     }
 
@@ -945,6 +962,17 @@ export function MenuTab({ eventId, initialItems, initialMenuJson }: MenuTabProps
                 onOpenChange={setIsManageCatsOpen}
                 initialCategoryId={selectedCategoryId}
             />
+
+            {catToDelete && (
+                <DeleteCategoryDialog
+                    isOpen={isDeleteDialogOpen}
+                    onOpenChange={setIsDeleteDialogOpen}
+                    categoryName={catToDelete.name}
+                    isSubcategory={!!catToDelete.parentId}
+                    parentName={allCategories.find(c => c.id === catToDelete.parentId)?.name}
+                    onConfirm={onConfirmDeleteCategory}
+                />
+            )}
         </div >
     );
 }

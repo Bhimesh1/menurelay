@@ -89,13 +89,116 @@ export async function createCategory(eventId: string, data: { name: string, pare
     return category
 }
 
-export async function deleteCategory(id: string) {
+export async function deleteCategory(id: string, deleteAllItems: boolean = false) {
     const session = await auth()
     if (!session?.user?.id) throw new Error("Unauthorized")
 
-    // Note: Items in this category might need to be reassigned or deleted.
-    // In schema.prisma, MenuItem has categoryId but NO onDelete: Cascade by default for Category relation.
-    // Let's check schema.prisma
+    // Get the category to be deleted
+    const category = await prisma.category.findUnique({
+        where: { id },
+        include: {
+            items: true,
+            children: true,
+            parent: true
+        }
+    }) as any
+
+    if (!category) throw new Error("Category not found")
+
+    const eventId = category.eventId
+    const isSubcategory = !!category.parentId
+
+    if (deleteAllItems) {
+        // DELETE EVERYTHING MODE
+        const subcategoryIds = category.children?.map((c: any) => c.id) || []
+        const allCategoryIds = [id, ...subcategoryIds]
+
+        // Delete all items in these categories
+        await prisma.menuItem.deleteMany({
+            where: {
+                categoryId: { in: allCategoryIds }
+            }
+        })
+
+        // Delete subcategories
+        if (subcategoryIds.length > 0) {
+            await prisma.category.deleteMany({
+                where: {
+                    id: { in: subcategoryIds }
+                }
+            })
+        }
+    } else {
+        // PRESERVE ITEMS MODE (Smart Reassignment)
+        if (isSubcategory) {
+            // SUBCATEGORY DELETION: Move items to parent category
+            const parentId = category.parentId
+
+            if (category.items.length > 0) {
+                await prisma.menuItem.updateMany({
+                    where: { categoryId: id },
+                    data: {
+                        categoryId: parentId,
+                        category: category.parent?.name || "General",
+                        subCategory: null
+                    } as any
+                })
+            }
+        } else {
+            // MAIN CATEGORY DELETION: Move all items to "General"
+
+            // Find or create "General" category
+            let generalCategory = await prisma.category.findFirst({
+                where: {
+                    eventId,
+                    name: "General",
+                    parentId: null
+                }
+            })
+
+            if (!generalCategory) {
+                generalCategory = await prisma.category.create({
+                    data: {
+                        eventId,
+                        name: "General",
+                        key: "general",
+                        type: "FOOD",
+                        sort: 999,
+                        isHidden: false
+                    } as any
+                })
+            }
+
+            // Collect all items from this category and its subcategories
+            const subcategoryIds = category.children?.map((c: any) => c.id) || []
+            const allCategoryIds = [id, ...subcategoryIds]
+
+            // Move all items to General
+            if (allCategoryIds.length > 0) {
+                await prisma.menuItem.updateMany({
+                    where: {
+                        categoryId: { in: allCategoryIds }
+                    },
+                    data: {
+                        categoryId: generalCategory.id,
+                        category: "General",
+                        subCategory: null
+                    } as any
+                })
+            }
+
+            // Delete all subcategories
+            if (subcategoryIds.length > 0) {
+                await prisma.category.deleteMany({
+                    where: {
+                        id: { in: subcategoryIds }
+                    }
+                })
+            }
+        }
+    }
+
+    // Finally, delete the category itself
     await prisma.category.delete({
         where: { id }
     })
