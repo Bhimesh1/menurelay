@@ -129,12 +129,27 @@ export function GuestMenuClient({
 
     // Filter Items
     const filteredItems = useMemo(() => {
-        let items = menuItems.filter(item => !item.isHidden)
+        // Find IDs of hidden categories and their recursively hidden children
+        const hiddenCatIds = categories.filter(c => (c as any).isHidden).map(c => c.id)
+
+        let items = menuItems.filter(item => {
+            // Hide if item itself is hidden
+            if (item.isHidden) return false
+
+            // Hide if item's category is hidden
+            if (item.categoryId && hiddenCatIds.includes(item.categoryId)) return false
+
+            // Note: If a parent is hidden, we should also hide its subcategories' items.
+            const cat = categories.find(c => c.id === item.categoryId)
+            if (cat && (cat as any).parentId && hiddenCatIds.includes((cat as any).parentId)) return false
+
+            return true
+        })
 
         if (activeCategory !== "all" && activeCategory !== "bundles") {
             // Get subcategories of the active category
             const subCatIds = categories
-                .filter(c => c.parentId === activeCategory)
+                .filter(c => (c as any).parentId === activeCategory && !(c as any).isHidden)
                 .map(c => c.id)
 
             items = items.filter(item =>
@@ -161,6 +176,9 @@ export function GuestMenuClient({
         filteredItems.forEach(item => {
             const cat = categories.find(c => c.id === item.categoryId)
             const subName = (cat && cat.parentId) ? cat.name : "None"
+
+            // Skip grouping if the specific subcategory is hidden
+            if (cat && cat.parentId && (cat as any).isHidden) return
 
             if (!groups[subName]) groups[subName] = []
             groups[subName].push(item)
@@ -496,7 +514,7 @@ export function GuestMenuClient({
                                 Set Menus ✨
                             </button>
                         )}
-                        {categories.filter(c => !c.parentId).map(cat => (
+                        {categories.filter(c => !(c as any).parentId && !(c as any).isHidden).map(cat => (
                             <button
                                 key={cat.id}
                                 onClick={() => setActiveCategory(cat.id)}

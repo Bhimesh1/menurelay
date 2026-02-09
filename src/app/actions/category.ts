@@ -15,7 +15,7 @@ export async function getCategories(eventId: string) {
     })
 }
 
-export async function updateCategory(id: string, data: { name?: string, parentId?: string | null, sort?: number }) {
+export async function updateCategory(id: string, data: { name?: string, parentId?: string | null, sort?: number, isHidden?: boolean }) {
     const session = await auth()
     if (!session?.user?.id) throw new Error("Unauthorized")
 
@@ -30,8 +30,9 @@ export async function updateCategory(id: string, data: { name?: string, parentId
         data: {
             name: data.name,
             parentId: data.parentId === undefined ? undefined : data.parentId,
-            sort: data.sort
-        },
+            sort: data.sort,
+            isHidden: data.isHidden
+        } as any,
         include: { parent: true }
     })
 
@@ -79,8 +80,9 @@ export async function createCategory(eventId: string, data: { name: string, pare
             name: data.name,
             parentId: data.parentId,
             type: data.type || "FOOD",
+            isHidden: false,
             key: data.name.toLowerCase().replace(/[^a-z0-9]/g, "-"), // Simple key generation
-        }
+        } as any
     })
 
     revalidatePath(`/admin/e/[slug]`, "page")

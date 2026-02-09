@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, Trash2, Edit2, Search, Utensils, Coffee, FileUp, Leaf, ShieldAlert, CheckCircle, Save, Download, XCircle, AlertCircle, RotateCcw } from "lucide-react"
+import { Plus, Trash2, Edit2, Search, Utensils, Coffee, FileUp, Leaf, ShieldAlert, CheckCircle, Save, Download, XCircle, AlertCircle, RotateCcw, Eye, EyeOff } from "lucide-react"
 import { deleteMenuItem, deleteAllMenuItems, addMenuItem, updateMenuItem, importMenuFromJson, getMenuJson, deleteCategory as deleteCategoryFromMenu } from "@/app/actions/menu"
 import { getCategories, updateCategory, createCategory, deleteCategory } from "@/app/actions/category"
 import { extractTextFromPDF } from "@/app/actions/pdf"
@@ -54,6 +54,10 @@ export function MenuTab({ eventId, initialItems, initialMenuJson }: MenuTabProps
         const cats = await getCategories(eventId)
         setAllCategories(cats)
     }
+
+    useEffect(() => {
+        fetchCats()
+    }, [])
 
     useEffect(() => {
         if (isManageCatsOpen || isAddOpen) fetchCats()
@@ -607,6 +611,23 @@ export function MenuTab({ eventId, initialItems, initialMenuJson }: MenuTabProps
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
+                                                        onClick={async () => {
+                                                            const cat = allCategories.find(c => c.name === category)
+                                                            if (cat) {
+                                                                await updateCategory(cat.id, { isHidden: !cat.isHidden })
+                                                                fetchCats()
+                                                                toast.success(`Category "${category}" ${!cat.isHidden ? "hidden" : "visible"}`)
+                                                            }
+                                                        }}
+                                                        className={cn("h-8 w-8 p-0 rounded-xl transition-all active:scale-95",
+                                                            allCategories.find(c => c.name === category)?.isHidden ? "text-amber-500 hover:bg-amber-50" : "text-slate-400 hover:text-indigo-600 hover:bg-indigo-50"
+                                                        )}
+                                                    >
+                                                        {allCategories.find(c => c.name === category)?.isHidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
                                                         onClick={() => {
                                                             const cat = allCategories.find(c => c.name === category)
                                                             setSelectedCategoryId(cat?.id)
@@ -650,6 +671,25 @@ export function MenuTab({ eventId, initialItems, initialMenuJson }: MenuTabProps
                                                                 </Badge>
                                                             </div>
                                                             <div className="flex items-center gap-2 opacity-30 group-hover/sub:opacity-100 transition-opacity pr-4">
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    onClick={async () => {
+                                                                        const cat = allCategories.find(c =>
+                                                                            c.name.toLowerCase() === subCategory.toLowerCase() && c.parentId
+                                                                        )
+                                                                        if (cat) {
+                                                                            await updateCategory(cat.id, { isHidden: !cat.isHidden })
+                                                                            fetchCats()
+                                                                            toast.success(`Subcategory "${subCategory}" ${!cat.isHidden ? "hidden" : "visible"}`)
+                                                                        }
+                                                                    }}
+                                                                    className={cn("h-8 w-8 p-0 rounded-xl transition-all active:scale-95",
+                                                                        allCategories.find(c => c.name.toLowerCase() === subCategory.toLowerCase() && c.parentId)?.isHidden ? "text-amber-500 hover:bg-amber-50" : "text-slate-400 hover:text-indigo-600 hover:bg-indigo-50"
+                                                                    )}
+                                                                >
+                                                                    {allCategories.find(c => c.name.toLowerCase() === subCategory.toLowerCase() && c.parentId)?.isHidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                                                </Button>
                                                                 <Button
                                                                     variant="ghost"
                                                                     size="sm"
@@ -714,8 +754,21 @@ export function MenuTab({ eventId, initialItems, initialMenuJson }: MenuTabProps
                                                     <TableCell className="text-right font-black text-slate-900 text-sm align-top py-4">
                                                         {item.price ? `${item.price.toFixed(2)}€` : "—"}
                                                     </TableCell>
-                                                    <TableCell className="pr-8 align-top py-3">
-                                                        <div className="flex justify-center gap-2">
+                                                    <TableCell className="align-top py-4 text-center">
+                                                        <div className="flex items-center justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-200">
+                                                            <Button
+                                                                variant="outline" size="icon"
+                                                                className={cn("h-8 w-8 border-slate-200 bg-white rounded-lg transition-all shadow-sm active:scale-95",
+                                                                    item.isHidden ? "text-amber-500 hover:bg-amber-50 ring-2 ring-amber-100 border-amber-200" : "text-slate-400 hover:text-indigo-600 hover:ring-2 hover:ring-indigo-100"
+                                                                )}
+                                                                onClick={async () => {
+                                                                    await updateMenuItem(item.id, { isHidden: !item.isHidden })
+                                                                    router.refresh()
+                                                                    toast.success(`Dish "${item.name}" ${!item.isHidden ? "hidden" : "visible"}`)
+                                                                }}
+                                                            >
+                                                                {item.isHidden ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                                                            </Button>
                                                             <Button
                                                                 variant="outline" size="icon" className="h-8 w-8 border-slate-200 bg-white rounded-lg hover:text-indigo-600 hover:ring-2 hover:ring-indigo-100 active:scale-95 transition-all shadow-sm"
                                                                 onClick={() => startEdit(item)}

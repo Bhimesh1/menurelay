@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { updateCategory, createCategory, deleteCategory } from "@/app/actions/category"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
-import { Trash2, Plus, Save, Edit2 } from "lucide-react"
+import { Trash2, Plus, Save, Edit2, Eye, EyeOff } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface CategoryManagerProps {
@@ -144,6 +144,14 @@ export function CategoryManager({ eventId, categories, isOpen, onOpenChange, ini
                                         ))}
                                     </SelectContent>
                                 </Select>
+
+                                <Button
+                                    size="icon" variant="ghost"
+                                    className={cn("h-10 w-10 rounded-xl transition-colors", cat.isHidden ? "text-amber-500 hover:bg-amber-50" : "text-slate-400 hover:text-indigo-600 hover:bg-indigo-50")}
+                                    onClick={() => handleUpdate(cat.id, { isHidden: !cat.isHidden })}
+                                >
+                                    {cat.isHidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                </Button>
 
                                 <div className="flex gap-1">
                                     {editingCatId === cat.id ? (
